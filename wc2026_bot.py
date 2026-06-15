@@ -549,11 +549,11 @@ def job_reminders():
             if 28 <= mins_to <= 32 and uid not in sent:
                 stage = m.get("group") or m.get("round", "")
                 city  = m.get("ground", "")
-                pt    = to_local(m["date"], m["time"])
+                pt    = to_local(m["date"], m["time"], LOCAL_TZ)
                 broadcast_plain(
                     f"{t('kickoff_30', stage=stage)}\n"
                     f"{team_str(m['team1'])} vs {team_str(m['team2'])}\n" +
-                    t("kickoff_time", time=pt, city=city)
+                    t("kickoff_time", time=pt, city=city, tz="PT")
                 )
                 sent.add(uid)
                 new = True
