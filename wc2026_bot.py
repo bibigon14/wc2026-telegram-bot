@@ -337,9 +337,68 @@ def save_json(path: str, data):
         json.dump(data, f)
 
 def fetch_openfootball() -> list:
-    r = requests.get(SCHEDULE_URL, timeout=15)
-    r.raise_for_status()
-    return r.json()["matches"]
+    """Parse openfootball txt schedule (new format)."""
+    try:
+        url = "https://raw.githubusercontent.com/openfootball/worldcup/master/2026--usa/cup.txt"
+        text = requests.get(url, timeout=15).text
+        MONTHS = {
+            "jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,
+            "jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12,
+            "january":1,"february":2,"march":3,"april":4,"june":6,
+            "july":7,"august":8,"september":9,"october":10,"november":11,"december":12,
+        }
+        matches = []
+        current_date = None
+        current_group = ""
+        for line in text.splitlines():
+            s = line.strip()
+            if not s or s.startswith("#") or s.startswith("=") or s.startswith("("):
+                continue
+            # Group header: ▪ Group A
+            gm = re.match(r"[^\w]*Group\s+(\S+)", s)
+            if gm and "Matchday" not in s:
+                current_group = f"Group {gm.group(1)}"
+                continue
+            # Date header: Thu June 11 or Mon Jun 15
+            dm = re.match(r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+(\w+)\s+(\d+)", s)
+            if dm:
+                mn = MONTHS.get(dm.group(1).lower()) or MONTHS.get(dm.group(1).lower()[:3])
+                if mn:
+                    current_date = f"2026-{mn:02d}-{int(dm.group(2)):02d}"
+                continue
+            # Match line: 13:00 UTC-6   Team1  v  Team2  @ City
+            mm = re.match(r"(\d{2}:\d{2})\s+UTC([+-]\d+)\s+(.+)", s)
+            if mm and current_date:
+                h, mi = map(int, mm.group(1).split(":"))
+                off = int(mm.group(2))
+                sign = "+" if off >= 0 else ""
+                utc_t = f"{h:02d}:{mi:02d} UTC{sign}{off}"
+                rest = mm.group(3)
+                at = rest.rsplit("@", 1)
+                if len(at) != 2:
+                    continue
+                body = at[0].strip()
+                venue = at[1].strip()
+                # Scheduled: "Team1   v   Team2"
+                vm = re.match(r"(.+?)\s{2,}v\s+(.+)", body)
+                if vm:
+                    t1, t2 = vm.group(1).strip(), vm.group(2).strip()
+                else:
+                    # Finished: "Team1   2-1 (1-0)   Team2"
+                    fm = re.match(r"(.+?)\s{2,}\d+-\d+(?:\s*\([^)]+\))?\s+(.+)", body)
+                    if fm:
+                        t1, t2 = fm.group(1).strip(), fm.group(2).strip()
+                    else:
+                        continue
+                matches.append({
+                    "date": current_date, "time": utc_t,
+                    "team1": t1, "team2": t2,
+                    "ground": venue, "group": current_group, "round": "",
+                })
+        return matches
+    except Exception as e:
+        print(f"[fetch_openfootball] ERR: {e}")
+        return []
 
 def football_api(endpoint: str, params: dict = None):
     r = requests.get(f"{API_BASE}{endpoint}", headers=API_HEADERS, params=params, timeout=15)
