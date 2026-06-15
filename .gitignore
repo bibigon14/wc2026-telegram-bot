@@ -1,0 +1,10 @@
+.env
+*.log
+sent_results.json
+sent_reminders.json
+live_scores.json
+subscribers.json
+timezones.json
+user_langs.json
+__pycache__/
+*.pyc
