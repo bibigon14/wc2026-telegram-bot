@@ -467,6 +467,7 @@ def job_schedule():
         all_m = fetch_openfootball()
         matches = [m for m in all_m if m["date"] == today]
         for _cid in load_subscribers():
+            _user_ctx.lang = get_user_lang(_cid)
             send_md(build_schedule_message(matches, today, get_user_tz(_cid)), _cid)
         print(f"[{now_pt().strftime('%I:%M %p PT')}] ✅ Schedule sent ({len(matches)} matches)")
     except Exception as e:
