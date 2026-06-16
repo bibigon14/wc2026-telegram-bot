@@ -521,7 +521,9 @@ def job_results():
                 elif "extra" in txt or "aet" in txt:
                     extra = t("aet")
             group = event.get("season", {}).get("slug", "").replace("-", " ").title()
-            broadcast_plain(f"{t('full_time')}\n{team_str(home)} {h}–{a} {team_str(away)}{extra}")
+            for _cid in load_subscribers():
+                _user_ctx.lang = get_user_lang(_cid)
+                send_plain(f"{t('full_time')}\n{team_str(home)} {h}–{a} {team_str(away)}{extra}", _cid)
             sent.add(eid)
             new = True
             print(f"[{now_pt().strftime('%I:%M %p PT')}] 🏁 Result: {home} {h}–{a} {away}")
@@ -551,11 +553,16 @@ def job_reminders():
                 stage = m.get("group") or m.get("round", "")
                 city  = m.get("ground", "")
                 pt    = to_local(m["date"], m["time"], LOCAL_TZ)
-                broadcast_plain(
-                    f"{t('kickoff_30', stage=stage)}\n"
-                    f"{team_str(m['team1'])} vs {team_str(m['team2'])}\n" +
-                    t("kickoff_time", time=pt, city=city, tz="PT")
-                )
+                for _cid in load_subscribers():
+                    _user_ctx.lang = get_user_lang(_cid)
+                    _utz = get_user_tz(_cid)
+                    pt = to_local(m["date"], m["time"], _utz)
+                    send_plain(
+                        f"{t('kickoff_30', stage=stage)}\n"
+                        f"{team_str(m['team1'])} vs {team_str(m['team2'])}\n" +
+                        t("kickoff_time", time=pt, city=city, tz=tz_label(_utz)),
+                        _cid
+                    )
                 sent.add(uid)
                 new = True
                 print(f"[{now_pt().strftime('%I:%M %p PT')}] ⏰ Reminder: {m['team1']} vs {m['team2']}")
@@ -594,10 +601,9 @@ def job_live():
             minute = event["status"].get("displayClock", "?")
 
             if eid in prev and prev[eid] != key:
-                broadcast_plain(
-                    f"{t('goal', minute=minute)}\n"
-                    f"{team_str(home)} {h}–{a} {team_str(away)}"
-                )
+                for _cid in load_subscribers():
+                    _user_ctx.lang = get_user_lang(_cid)
+                    send_plain(f"{t('goal', minute=minute)}\n{team_str(home)} {h}–{a} {team_str(away)}", _cid)
                 print(f"[{now_pt().strftime('%I:%M %p PT')}] ⚽ Goal: {home} {h}–{a} {away} ({minute}')")
 
             updated[eid] = key
