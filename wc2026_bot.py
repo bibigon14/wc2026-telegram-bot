@@ -1392,6 +1392,24 @@ def set_commands():
 
 # ── Telegram polling ──────────────────────
 
+def check_rate_limit(chat_id: str, limit: int = 5, window: int = 60) -> bool:
+    """
+    Per-user sliding-window rate limit using Redis.
+    Returns True if the request is allowed, False if rate-limited.
+    Fails open (allows the request) if Redis is unavailable.
+    """
+    if not _redis:
+        return True
+    key = f"wc2026:ratelimit:{chat_id}"
+    try:
+        count = _redis.incr(key)
+        if count == 1:
+            _redis.expire(key, window)
+        return count <= limit
+    except Exception as e:
+        print(f"[redis] rate limit check failed: {e}")
+        return True
+
 def handle_update(update: dict):
     msg = update.get("message") or update.get("channel_post")
     if not msg:
@@ -1400,6 +1418,9 @@ def handle_update(update: dict):
     chat_id = str(msg["chat"]["id"])
     _user_ctx.lang = get_user_lang(chat_id)
     if not text.startswith("/"):
+        return
+    if not check_rate_limit(chat_id):
+        send_plain("⏳ Too many requests — please wait a minute." if get_user_lang(chat_id) != "ru" else "⏳ Слишком много запросов — подожди минутку.", chat_id)
         return
     # Access log
     frm      = msg.get("from", {})
