@@ -32,6 +32,7 @@ import schedule
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
+import redis
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
 
@@ -45,6 +46,21 @@ _user_ctx        = threading.local()
 SCHEDULE_URL  = "https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json"
 API_BASE      = "https://api.football-data.org/v4"
 API_HEADERS   = {"X-Auth-Token": FOOTBALL_API_KEY}
+
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+
+try:
+    _redis = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, socket_connect_timeout=2)
+    _redis.ping()
+    print(f"[redis] connected to {REDIS_HOST}:{REDIS_PORT}")
+except Exception as e:
+    print(f"[redis] unavailable ({e}), falling back to no-cache mode")
+    _redis = None
+
+CACHE_TTL_LIVE     = 30
+CACHE_TTL_STANDARD = 600
+CACHE_TTL_STATIC   = 3600
 ESPN_URL      = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"
 
 LOCAL_TZ = timezone(timedelta(hours=-7))  # PDT; change to -8 in winter
@@ -400,10 +416,30 @@ def fetch_openfootball() -> list:
         print(f"[fetch_openfootball] ERR: {e}")
         return []
 
-def football_api(endpoint: str, params: dict = None):
+def football_api(endpoint: str, params: dict = None, ttl: int = CACHE_TTL_STANDARD):
+    """
+    Cached wrapper around api.football-data.org.
+    Falls back to a live request transparently if Redis is unavailable
+    or the entry isn't cached yet.
+    """
+    cache_key = f"wc2026:api:{endpoint}:{json.dumps(params or {}, sort_keys=True)}"
+
+    if _redis:
+        cached = _redis.get(cache_key)
+        if cached is not None:
+            return json.loads(cached)
+
     r = requests.get(f"{API_BASE}{endpoint}", headers=API_HEADERS, params=params, timeout=15)
     r.raise_for_status()
-    return r.json()
+    data = r.json()
+
+    if _redis:
+        try:
+            _redis.setex(cache_key, ttl, json.dumps(data))
+        except Exception as e:
+            print(f"[redis] setex failed: {e}")
+
+    return data
 
 def find_team(query: str, matches: list) -> str | None:
     query = query.strip().lower()
@@ -555,6 +591,7 @@ def job_reminders():
                 pt    = to_local(m["date"], m["time"], LOCAL_TZ)
                 for _cid in load_subscribers():
                     _user_ctx.lang = get_user_lang(_cid)
+                    print(f'[DEBUG reminder] cid={_cid} lang={_user_ctx.lang}')
                     _utz = get_user_tz(_cid)
                     pt = to_local(m["date"], m["time"], _utz)
                     send_plain(

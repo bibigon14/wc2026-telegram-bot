@@ -1,0 +1,38 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: homelab-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  wc2026bot:
+    build: .
+    container_name: wc2026-bot
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./sent_results.json:/app/sent_results.json
+      - ./sent_reminders.json:/app/sent_reminders.json
+      - ./live_scores.json:/app/live_scores.json
+      - ./subscribers.json:/app/subscribers.json
+      - ./timezones.json:/app/timezones.json
+      - ./user_langs.json:/app/user_langs.json
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis_data:
