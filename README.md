@@ -16,6 +16,9 @@ A real-time Telegram bot for the FIFA World Cup 2026, running on Raspberry Pi 5.
 - 🗺️ Per-user timezone (`/timezone moscow`, `/timezone minsk`, etc.)
 - 🌐 English / Russian localization (`/localization ru`)
 - 👥 Multi-user subscriptions for auto-notifications
+- ⚡ Redis-cached API calls — 10 min TTL, so a hundred people hitting `/standings` only costs one upstream request
+- 🐳 Dockerized — runs in an isolated container with `restart: always`
+- 🚦 Per-user rate limiting (5 commands/min) — keeps the bot polite to the upstream API when friends get spam-happy
 
 ## Commands
 
@@ -45,22 +48,27 @@ A real-time Telegram bot for the FIFA World Cup 2026, running on Raspberry Pi 5.
 - [football-data.org](https://football-data.org) — standings
 - [openfootball](https://github.com/openfootball/world-cup) — match schedule
 
+## Architecture
+
+```
+Telegram ⇄ wc2026_bot.py ⇄ Redis (cache + rate limit)
+                  │
+                  └──► football-data.org / ESPN / openfootball
+```
+
+Redis sits in front of every `football_api()` call with a 10-minute TTL, and
+tracks a per-`chat_id` sliding window (5 requests/min) so no single user can
+exhaust the bot's API quota. If Redis is ever unreachable, both the cache and
+the rate limiter fail open — the bot keeps working exactly as if Redis didn't
+exist, just without the caching benefit.
+
 ## Setup
 
 ### Requirements
 
-- Python 3.10+
-- Raspberry Pi (or any Linux server)
+- Docker + Docker Compose (recommended), or Python 3.10+ for a bare-metal run
 - Telegram Bot Token from [@BotFather](https://t.me/botfather)
 - football-data.org API key (free tier)
-
-### Install
-
-```bash
-git clone https://github.com/bibigon14/wc2026-telegram-bot.git
-cd wc2026-telegram-bot
-pip install requests schedule
-```
 
 ### Configure
 
@@ -75,13 +83,39 @@ CHECK_INTERVAL=5
 LANG_BOT=en
 ```
 
-### Run
+### Run with Docker (recommended)
 
 ```bash
+git clone https://github.com/bibigon14/wc2026-telegram-bot.git
+cd wc2026-telegram-bot
+docker compose up --build -d
+docker compose logs -f wc2026bot
+```
+
+This starts two containers: `redis` (cache + rate limiting) and `wc2026bot`
+(the bot itself), wired together on an internal Docker network. State files
+(`subscribers.json`, `sent_results.json`, etc.) are bind-mounted from the
+host, so they persist across rebuilds.
+
+Check the cache is working:
+
+```bash
+docker exec -it homelab-redis redis-cli KEYS "wc2026:*"
+```
+
+### Run bare-metal (alternative)
+
+```bash
+git clone https://github.com/bibigon14/wc2026-telegram-bot.git
+cd wc2026-telegram-bot
+pip install -r requirements.txt
 python3 wc2026_bot.py
 ```
 
-### Run as systemd service
+Without a running Redis instance the bot falls back to no-cache, no-rate-limit
+mode automatically — no extra configuration needed for a quick local test.
+
+### Run as systemd service (bare-metal only)
 
 ```ini
 [Unit]
