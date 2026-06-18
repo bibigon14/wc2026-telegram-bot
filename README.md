@@ -1,6 +1,6 @@
 # ⚽ FIFA World Cup 2026 Telegram Bot
 
-A real-time Telegram bot for the FIFA World Cup 2026, running on Raspberry Pi 5.
+A real-time Telegram bot for the FIFA World Cup 2026, running on a Raspberry Pi 5 homelab.
 
 ## Features
 
@@ -17,7 +17,8 @@ A real-time Telegram bot for the FIFA World Cup 2026, running on Raspberry Pi 5.
 - 🌐 English / Russian localization (`/localization ru`)
 - 👥 Multi-user subscriptions for auto-notifications
 - ⚡ Redis-cached API calls — 10 min TTL, so a hundred people hitting `/standings` only costs one upstream request
-- 🐳 Dockerized — runs in an isolated container with `restart: always`
+- 🗄️ Fully stateless — all bot state (subscribers, sent results, timezones, etc.) lives in Redis, not on local disk, so the pod can be killed and recreated at any time with zero data loss
+- ☸️ Runs as a Kubernetes Deployment on a single-node k3s cluster (see [homelab-k3s](https://github.com/bibigon14/homelab-k3s))
 - 🚦 Per-user rate limiting (5 commands/min) — keeps the bot polite to the upstream API when friends get spam-happy
 
 ## Commands
@@ -51,39 +52,37 @@ A real-time Telegram bot for the FIFA World Cup 2026, running on Raspberry Pi 5.
 ## Architecture
 
 ```
-Telegram ⇄ wc2026_bot.py ⇄ Redis (cache + rate limit)
+Telegram ⇄ wc2026_bot.py (k3s pod) ⇄ Redis (k3s pod: cache + rate limit + state)
                   │
                   └──► football-data.org / ESPN / openfootball
 ```
 
-Redis sits in front of every `football_api()` call with a 10-minute TTL, and
-tracks a per-`chat_id` sliding window (5 requests/min) so no single user can
-exhaust the bot's API quota. If Redis is ever unreachable, both the cache and
-the rate limiter fail open — the bot keeps working exactly as if Redis didn't
-exist, just without the caching benefit.
+Redis sits in front of every `football_api()` call with a 10-minute TTL, and tracks a per-`chat_id` sliding window (5 requests/min) so no single user can exhaust the bot's API quota. All bot state — subscribers, sent results, timezones, language preferences — is also stored in Redis (write-through, with a local JSON file as a backup that's only read if Redis is ever unreachable at startup). This makes the bot fully stateless from Kubernetes' point of view: no PersistentVolume needed, the pod can restart or reschedule freely.
 
-## Setup
+If Redis is ever unreachable, the cache and rate limiter fail open — the bot keeps working exactly as if Redis didn't exist, just without the caching/state benefits for that session.
 
-### Requirements
+## Deployment
 
-- Docker + Docker Compose (recommended), or Python 3.10+ for a bare-metal run
-- Telegram Bot Token from [@BotFather](https://t.me/botfather)
-- football-data.org API key (free tier)
+This bot runs as a Kubernetes Deployment on a single-node k3s cluster. Manifests live in [homelab-k3s/apps/wc2026bot](https://github.com/bibigon14/homelab-k3s/tree/main/apps/wc2026bot).
 
-### Configure
+```bash
+# build and import the image (no registry — single-node cluster)
+docker build -t wc2026-telegram-bot-wc2026bot:latest .
+docker save wc2026-telegram-bot-wc2026bot:latest | sudo k3s ctr images import -
 
-Create `.env` file:
+# create the secret with bot credentials (one-time)
+kubectl create secret generic wc2026-env --from-env-file=.env -n homelab
 
-```env
-BOT_TOKEN=your_telegram_bot_token
-CHAT_ID=your_chat_id
-FOOTBALL_API_KEY=your_football_data_api_key
-SEND_TIME=08:00
-CHECK_INTERVAL=5
-LANG_BOT=en
+# deploy
+kubectl apply -f /path/to/homelab-k3s/apps/wc2026bot/deployment.yaml
+
+# after a code change, rebuild/reimport (above) then:
+kubectl rollout restart deployment/wc2026bot -n homelab
 ```
 
-### Run with Docker (recommended)
+## Local development (Docker Compose)
+
+For local testing without touching the k3s cluster, Docker Compose still works:
 
 ```bash
 git clone https://github.com/bibigon14/wc2026-telegram-bot.git
@@ -92,12 +91,9 @@ docker compose up --build -d
 docker compose logs -f wc2026bot
 ```
 
-This starts two containers: `redis` (cache + rate limiting) and `wc2026bot`
-(the bot itself), wired together on an internal Docker network. State files
-(`subscribers.json`, `sent_results.json`, etc.) are bind-mounted from the
-host, so they persist across rebuilds.
+This starts two containers: `redis` and `wc2026bot`, wired together on an internal Docker network.
 
-Check the cache is working:
+Check the cache/state is working:
 
 ```bash
 docker exec -it homelab-redis redis-cli KEYS "wc2026:*"
@@ -112,26 +108,19 @@ pip install -r requirements.txt
 python3 wc2026_bot.py
 ```
 
-Without a running Redis instance the bot falls back to no-cache, no-rate-limit
-mode automatically — no extra configuration needed for a quick local test.
+Without a running Redis instance the bot falls back to no-cache, no-rate-limit, file-only-state mode automatically — no extra configuration needed for a quick local test.
 
-### Run as systemd service (bare-metal only)
+### Configure
 
-```ini
-[Unit]
-Description=World Cup 2026 Telegram Bot
-After=network.target
+Create `.env` file:
 
-[Service]
-User=your_user
-WorkingDirectory=/path/to/wc2026-telegram-bot
-EnvironmentFile=/path/to/wc2026-telegram-bot/.env
-ExecStart=/usr/bin/python3 /path/to/wc2026-telegram-bot/wc2026_bot.py
-Restart=on-failure
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
+```env
+BOT_TOKEN=your_telegram_bot_token
+CHAT_ID=your_chat_id
+FOOTBALL_API_KEY=your_football_data_api_key
+SEND_TIME=08:00
+CHECK_INTERVAL=5
+LANG_BOT=en
 ```
 
 ## Privacy
