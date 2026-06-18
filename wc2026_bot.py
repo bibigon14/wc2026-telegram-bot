@@ -343,12 +343,28 @@ def now_pt() -> datetime:
     return datetime.now(LOCAL_TZ)
 
 def load_json(path: str) -> dict | list:
+    """Redis-backed state. Falls back to local JSON file if Redis is unavailable."""
+    key = f"wc2026:state:{os.path.basename(path)}"
+    if _redis:
+        try:
+            cached = _redis.get(key)
+            if cached is not None:
+                return json.loads(cached)
+        except Exception as e:
+            print(f"[redis] get failed for {key}: {e}")
     if os.path.exists(path):
         with open(path) as f:
             return json.load(f)
     return {}
 
 def save_json(path: str, data):
+    """Write-through: Redis (primary) + local JSON file (backup)."""
+    key = f"wc2026:state:{os.path.basename(path)}"
+    if _redis:
+        try:
+            _redis.set(key, json.dumps(data))
+        except Exception as e:
+            print(f"[redis] set failed for {key}: {e}")
     with open(path, "w") as f:
         json.dump(data, f)
 
