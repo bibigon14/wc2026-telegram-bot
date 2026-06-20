@@ -30,10 +30,12 @@ import threading
 import requests
 import schedule
 from datetime import datetime, timezone, timedelta
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from prometheus_client import Counter, Histogram, Gauge, Info, start_http_server
 import redis
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
@@ -89,6 +91,105 @@ _http = _build_session()
 # touching every call site.
 requests.get  = _http.get
 requests.post = _http.post
+
+# ---------------------------------------------------------------------------
+# Prometheus metrics
+# ---------------------------------------------------------------------------
+# All metric names are namespaced under `wc2026_`. Counters end in `_total`,
+# histograms expose `_seconds`, gauges/info describe instantaneous state.
+M_EXTERNAL_API_REQUESTS = Counter(
+    "wc2026_external_api_requests_total",
+    "External API requests, by API and outcome.",
+    ["api", "outcome"],   # api: espn|football_data|telegram|other; outcome: success|client_error|server_error|exception
+)
+M_EXTERNAL_API_DURATION = Histogram(
+    "wc2026_external_api_duration_seconds",
+    "External API latency (full round-trip including retries).",
+    ["api"],
+    buckets=(0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0),
+)
+M_EXTERNAL_API_RETRIES = Counter(
+    "wc2026_external_api_retries_total",
+    "Number of urllib3 retry attempts triggered, by API.",
+    ["api"],
+)
+M_TELEGRAM_MESSAGES_SENT = Counter(
+    "wc2026_telegram_messages_sent_total",
+    "Telegram messages successfully sent by the bot, by message type.",
+    ["type"],   # type: schedule|result|reminder|live|command_response|other
+)
+M_TELEGRAM_ERRORS = Counter(
+    "wc2026_telegram_errors_total",
+    "Telegram API errors observed, by error type.",
+    ["error_type"],   # http_4xx|http_5xx|network|timeout
+)
+M_CACHE_OPERATIONS = Counter(
+    "wc2026_cache_operations_total",
+    "Redis cache operations, by op and outcome.",
+    ["op", "outcome"],  # op: get|set; outcome: hit|miss|error
+)
+M_BUILD_INFO = Info(
+    "wc2026_build",
+    "Build information for the wc2026 bot process.",
+)
+M_BUILD_INFO.info({
+    "version": os.environ.get("WC2026_VERSION", "dev"),
+})
+
+
+def _classify_api(url: str) -> str:
+    """Map an outbound URL to a coarse API label for metrics."""
+    host = urlparse(url).netloc.lower()
+    if "espn.com" in host:
+        return "espn"
+    if "football-data.org" in host:
+        return "football_data"
+    if "api.telegram.org" in host:
+        return "telegram"
+    return "other"
+
+
+def _instrument_response(response, *args, **kwargs):
+    """
+    Response hook attached to the module-level session. Runs once per
+    completed request — after all urllib3 retries finish. Records
+    request count, status outcome, and total wall-clock duration.
+    The retry counter is derived from urllib3's connection-pool history
+    attached to the response.
+    """
+    try:
+        url = response.url
+        api = _classify_api(url)
+        # The session timer is set by a request hook below.
+        elapsed = response.elapsed.total_seconds()
+        M_EXTERNAL_API_DURATION.labels(api=api).observe(elapsed)
+
+        status = response.status_code
+        if status < 400:
+            outcome = "success"
+        elif status < 500:
+            outcome = "client_error"
+        else:
+            outcome = "server_error"
+        M_EXTERNAL_API_REQUESTS.labels(api=api, outcome=outcome).inc()
+
+        # Telegram-specific error breakdown
+        if api == "telegram" and status >= 400:
+            error_type = "http_4xx" if status < 500 else "http_5xx"
+            M_TELEGRAM_ERRORS.labels(error_type=error_type).inc()
+
+        # Count urllib3 retry hops (history length is how many redirects/retries
+        # occurred before the final response).
+        retries = len(getattr(response, "history", []))
+        if retries:
+            M_EXTERNAL_API_RETRIES.labels(api=api).inc(retries)
+    except Exception:
+        # Metrics must never break the request flow.
+        pass
+    return response
+
+
+_http.hooks["response"].append(_instrument_response)
 
 LOCAL_TZ = timezone(timedelta(hours=-7))  # PDT; change to -8 in winter
 TZ_ALIASES = {
@@ -468,9 +569,16 @@ def football_api(endpoint: str, params: dict = None, ttl: int = CACHE_TTL_STANDA
     cache_key = f"wc2026:api:{endpoint}:{json.dumps(params or {}, sort_keys=True)}"
 
     if _redis:
-        cached = _redis.get(cache_key)
+        try:
+            cached = _redis.get(cache_key)
+        except Exception as e:
+            M_CACHE_OPERATIONS.labels(op="get", outcome="error").inc()
+            print(f"[redis] get failed: {e}")
+            cached = None
         if cached is not None:
+            M_CACHE_OPERATIONS.labels(op="get", outcome="hit").inc()
             return json.loads(cached)
+        M_CACHE_OPERATIONS.labels(op="get", outcome="miss").inc()
 
     r = requests.get(f"{API_BASE}{endpoint}", headers=API_HEADERS, params=params, timeout=15)
     r.raise_for_status()
@@ -479,7 +587,9 @@ def football_api(endpoint: str, params: dict = None, ttl: int = CACHE_TTL_STANDA
     if _redis:
         try:
             _redis.setex(cache_key, ttl, json.dumps(data))
+            M_CACHE_OPERATIONS.labels(op="set", outcome="hit").inc()
         except Exception as e:
+            M_CACHE_OPERATIONS.labels(op="set", outcome="error").inc()
             print(f"[redis] setex failed: {e}")
 
     return data
@@ -498,25 +608,41 @@ def find_team(query: str, matches: list) -> str | None:
 
 # ── Telegram send ─────────────────────────
 
-def send_md(text: str, chat_id: str = None):
+def send_md(text: str, chat_id: str = None, msg_type: str = "other"):
     """Send with Markdown formatting."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={
-        "chat_id": chat_id or CHAT_ID,
-        "text": text,
-        "parse_mode": "Markdown"
-    }, timeout=15)
+    try:
+        r = requests.post(url, json={
+            "chat_id": chat_id or CHAT_ID,
+            "text": text,
+            "parse_mode": "Markdown"
+        }, timeout=15)
+        if r.status_code < 400:
+            M_TELEGRAM_MESSAGES_SENT.labels(type=msg_type).inc()
+    except requests.exceptions.RequestException as e:
+        # Distinguish socket/connection timeouts from generic network errors.
+        # HTTP-level 4xx/5xx already counted via the response hook.
+        is_timeout = isinstance(e, requests.exceptions.Timeout)
+        M_TELEGRAM_ERRORS.labels(error_type="timeout" if is_timeout else "network").inc()
+        raise
 
-def send_plain(text: str, chat_id: str = None):
+def send_plain(text: str, chat_id: str = None, msg_type: str = "other"):
     """Send plain text, no formatting."""
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    requests.post(url, json={
-        "chat_id": chat_id or CHAT_ID,
-        "text": text
-    }, timeout=15)
+    try:
+        r = requests.post(url, json={
+            "chat_id": chat_id or CHAT_ID,
+            "text": text
+        }, timeout=15)
+        if r.status_code < 400:
+            M_TELEGRAM_MESSAGES_SENT.labels(type=msg_type).inc()
+    except requests.exceptions.RequestException as e:
+        is_timeout = isinstance(e, requests.exceptions.Timeout)
+        M_TELEGRAM_ERRORS.labels(error_type="timeout" if is_timeout else "network").inc()
+        raise
 
 def reply(chat_id: str, text: str):
-    send_md(text, chat_id)
+    send_md(text, chat_id, msg_type="command_response")
 
 
 # ── Daily schedule ────────────────────────
@@ -547,7 +673,7 @@ def job_schedule():
         matches = [m for m in all_m if m["date"] == today]
         for _cid in load_subscribers():
             _user_ctx.lang = get_user_lang(_cid)
-            send_md(build_schedule_message(matches, today, get_user_tz(_cid)), _cid)
+            send_md(build_schedule_message(matches, today, get_user_tz(_cid)), _cid, msg_type="schedule")
         print(f"[{now_pt().strftime('%I:%M %p PT')}] ✅ Schedule sent ({len(matches)} matches)")
     except Exception as e:
         print(f"[{now_pt().strftime('%I:%M %p PT')}] ❌ Schedule: {e}")
@@ -602,7 +728,7 @@ def job_results():
             group = event.get("season", {}).get("slug", "").replace("-", " ").title()
             for _cid in load_subscribers():
                 _user_ctx.lang = get_user_lang(_cid)
-                send_plain(f"{t('full_time')}\n{team_str(home)} {h}–{a} {team_str(away)}{extra}", _cid)
+                send_plain(f"{t('full_time')}\n{team_str(home)} {h}–{a} {team_str(away)}{extra}", _cid, msg_type="result")
             sent.add(eid)
             new = True
             print(f"[{now_pt().strftime('%I:%M %p PT')}] 🏁 Result: {home} {h}–{a} {away}")
@@ -641,7 +767,8 @@ def job_reminders():
                         f"{t('kickoff_30', stage=stage)}\n"
                         f"{team_str(m['team1'])} vs {team_str(m['team2'])}\n" +
                         t("kickoff_time", time=pt, city=city, tz=tz_label(_utz)),
-                        _cid
+                        _cid,
+                        msg_type="reminder",
                     )
                 sent.add(uid)
                 new = True
@@ -683,7 +810,7 @@ def job_live():
             if eid in prev and prev[eid] != key:
                 for _cid in load_subscribers():
                     _user_ctx.lang = get_user_lang(_cid)
-                    send_plain(f"{t('goal', minute=minute)}\n{team_str(home)} {h}–{a} {team_str(away)}", _cid)
+                    send_plain(f"{t('goal', minute=minute)}\n{team_str(home)} {h}–{a} {team_str(away)}", _cid, msg_type="live")
                 print(f"[{now_pt().strftime('%I:%M %p PT')}] ⚽ Goal: {home} {h}–{a} {away} ({minute}')")
 
             updated[eid] = key
@@ -1579,6 +1706,13 @@ if __name__ == "__main__":
         sys.exit(1)
 
     print("🤖 World Cup 2026 bot starting...")
+
+    # Start Prometheus metrics endpoint on :9120
+    # (matches the NodePort exposed by the chart)
+    metrics_port = int(os.environ.get("METRICS_PORT", "9120"))
+    start_http_server(metrics_port)
+    print(f"📊 Prometheus metrics on :{metrics_port}/metrics")
+
     set_commands()
 
     # Run immediately on start
