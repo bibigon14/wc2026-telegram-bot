@@ -874,19 +874,33 @@ def cmd_scorers(chat_id: str):
             stats.items(),
             key=lambda x: (-x[1]["goals"], -x[1]["assists"], x[0])
         )
-        top10 = sorted_stats[:10]
-        lines = [t("scorers_hdr") + "\n`# Player              G  A`"]
+        # First pass: compute dense rank for every player, don't render yet
+        ranked = []
         prev = None
         display_rank = 0
-        for player, info in top10:
+        for player, info in sorted_stats:
             key = (info["goals"], info["assists"])
             if key != prev:
                 display_rank += 1
                 prev = key
+            ranked.append((display_rank, player, info))
+
+        # Show all players within the top 3 places; if that's fewer than
+        # 10 rows (places are spread out, little/no tying), extend to the
+        # top 10 places instead so the list isn't too short.
+        cutoff_rank = 3
+        rows_at_cutoff = sum(1 for r, _, _ in ranked if r <= cutoff_rank)
+        if rows_at_cutoff < 10:
+            cutoff_rank = 10
+
+        lines = [t("scorers_hdr") + "\n`# Player              G  A`"]
+        for rank, player, info in ranked:
+            if rank > cutoff_rank:
+                break
             g = info["goals"]
             a = info["assists"]
             team = info["team"]
-            lines.append(f"{display_rank}. *{player}* {flag(team)} — ⚽ {g}  🎯 {a}")
+            lines.append(f"{rank}. *{player}* {flag(team)} — ⚽ {g}  🎯 {a}")
         reply(chat_id, "\n".join(lines))
     except Exception as e:
         reply(chat_id, f"❌ Error fetching scorers: {e}")
