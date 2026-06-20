@@ -32,6 +32,8 @@ import schedule
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import redis
 
 load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
@@ -62,6 +64,31 @@ CACHE_TTL_LIVE     = 30
 CACHE_TTL_STANDARD = 600
 CACHE_TTL_STATIC   = 3600
 ESPN_URL      = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"
+
+# ESPN's CDN (Akamai) occasionally rejects TLS handshakes mid-connection
+# with TLSV1_ALERT_INTERNAL_ERROR. These are transient and almost always
+# succeed on retry. Mount a retry-adapter on a module-level session and
+# replace bare requests.get/post calls so every outbound HTTP call inherits
+# the same transient-failure handling.
+def _build_session() -> requests.Session:
+    s = requests.Session()
+    retry = Retry(
+        total=4,
+        backoff_factor=1.5,         # 0s, 1.5s, 3s, 6s between retries
+        status_forcelist=(429, 500, 502, 503, 504),
+        allowed_methods=("GET", "POST"),
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    s.mount("https://", adapter)
+    s.mount("http://", adapter)
+    return s
+
+_http = _build_session()
+# Route bare requests.get/post through the retry-enabled session without
+# touching every call site.
+requests.get  = _http.get
+requests.post = _http.post
 
 LOCAL_TZ = timezone(timedelta(hours=-7))  # PDT; change to -8 in winter
 TZ_ALIASES = {
