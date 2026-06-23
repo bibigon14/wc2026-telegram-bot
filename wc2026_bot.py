@@ -760,7 +760,6 @@ def job_reminders():
                 pt    = to_local(m["date"], m["time"], LOCAL_TZ)
                 for _cid in load_subscribers():
                     _user_ctx.lang = get_user_lang(_cid)
-                    print(f'[DEBUG reminder] cid={_cid} lang={_user_ctx.lang}')
                     _utz = get_user_tz(_cid)
                     pt = to_local(m["date"], m["time"], _utz)
                     send_plain(
