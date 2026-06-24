@@ -21,6 +21,17 @@ A real-time Telegram bot for the FIFA World Cup 2026, running on a Raspberry Pi 
 - ☸️ Runs as a Kubernetes Deployment on a single-node k3s cluster (see [homelab-k3s](https://github.com/bibigon14/homelab-k3s))
 - 🚦 Per-user rate limiting (5 commands/min) — keeps the bot polite to the upstream API when friends get spam-happy
 
+
+## Screenshots
+
+| Today's Schedule | Live Scores | Notifications |
+|---|---|---|
+| ![Today](screenshots/today.png) | ![Live](screenshots/live.png) | ![Notifications](screenshots/notifications.png) |
+
+| Top Scorers | Standings | Cards |
+|---|---|---|
+| ![Scorers](screenshots/scorers.png) | ![Standings](screenshots/standings.png) | ![Cards](screenshots/cards.png) |
+
 ## Commands
 
 | Command | Description |
