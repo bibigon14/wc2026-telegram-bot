@@ -987,72 +987,35 @@ def fetch_all_espn_events():
 
 def cmd_scorers(chat_id: str):
     try:
-        from collections import defaultdict
-        stats = defaultdict(lambda: {"goals": 0, "assists": 0, "team": ""})
-        events = fetch_all_espn_events()
-        finished = [e for e in events if e["status"]["type"]["name"] == "STATUS_FULL_TIME"]
-        if not finished:
-            reply(chat_id, t("no_finished"))
-            return
-        for event in finished:
-            r = requests.get(
-                "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary",
-                params={"event": event["id"]}, timeout=15
-            )
-            r.raise_for_status()
-            for ke in r.json().get("keyEvents", []):
-                if not ke.get("scoringPlay"):
-                    continue
-                text = ke.get("text", "")
-                # Goal scorer: "Goal! Team X, Team Y. Player Name (Team) ..."
-                m = re.search(r"\. ([^(]+) \(([^)]+)\)", text)
-                if m:
-                    player = m.group(1).strip()
-                    team   = m.group(2).strip()
-                    stats[player]["goals"]  += 1
-                    stats[player]["team"]    = team
-                # Assist: "Assisted by Player Name."
-                a = re.search(r"Assisted by ([^.]+)\.", text)
-                if a:
-                    assistant = a.group(1).strip()
-                    # Find team from same event competitors
-                    if assistant not in stats:
-                        stats[assistant]["team"] = ke.get("team", {}).get("displayName", "")
-                    stats[assistant]["assists"] += 1
-        if not stats:
+        data = football_api("/competitions/WC/scorers?limit=20")
+        scorers = data.get("scorers", [])
+        if not scorers:
             reply(chat_id, t("no_scorers"))
             return
-        # Sort: goals desc, assists desc, name asc
-        sorted_stats = sorted(
-            stats.items(),
-            key=lambda x: (-x[1]["goals"], -x[1]["assists"], x[0])
-        )
-        # First pass: compute dense rank for every player, don't render yet
+
         ranked = []
         prev = None
         display_rank = 0
-        for player, info in sorted_stats:
-            key = (info["goals"], info["assists"])
+        for s in scorers:
+            g = s.get("goals") or 0
+            a = s.get("assists") or 0
+            key = (g, a)
             if key != prev:
                 display_rank += 1
                 prev = key
-            ranked.append((display_rank, player, info))
+            player = s["player"]["name"]
+            team   = s["team"]["name"]
+            ranked.append((display_rank, player, team, g, a))
 
-        # Show all players within the top 3 places; if that's fewer than
-        # 10 rows (places are spread out, little/no tying), extend to the
-        # top 10 places instead so the list isn't too short.
         cutoff_rank = 3
-        rows_at_cutoff = sum(1 for r, _, _ in ranked if r <= cutoff_rank)
+        rows_at_cutoff = sum(1 for r, *_ in ranked if r <= cutoff_rank)
         if rows_at_cutoff < 10:
             cutoff_rank = 10
 
         lines = [t("scorers_hdr") + "\n`# Player              G  A`"]
-        for rank, player, info in ranked:
+        for rank, player, team, g, a in ranked:
             if rank > cutoff_rank:
                 break
-            g = info["goals"]
-            a = info["assists"]
-            team = info["team"]
             lines.append(f"{rank}. *{player}* {flag(team)} — ⚽ {g}  🎯 {a}")
         reply(chat_id, "\n".join(lines))
     except Exception as e:
