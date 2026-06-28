@@ -829,10 +829,52 @@ def job_live():
 
 def cmd_today(chat_id: str):
     tz    = get_user_tz(chat_id)
-    today = datetime.now(tz).strftime("%Y-%m-%d")
-    all_m = fetch_openfootball()
-    matches = [m for m in all_m if m["date"] == today]
-    reply(chat_id, build_schedule_message(matches, today, tz))
+    today = datetime.now(tz).strftime("%Y%m%d")
+    try:
+        r = requests.get(ESPN_URL, params={"dates": today}, timeout=15)
+        r.raise_for_status()
+        events = r.json().get("events", [])
+        print(f"[cmd_today] date={today} events={len(events)}", flush=True)
+    except Exception as e:
+        reply(chat_id, f"❌ Error fetching schedule: {e}")
+        return
+    if not events:
+        reply(chat_id, t("no_matches", date=datetime.now(tz).strftime("%B %-d")))
+        return
+    today_label = datetime.now(tz).strftime("%A, %B %-d")
+    lines = [f"📅 *{today_label}*\n"]
+    for ev in events:
+        comp        = ev.get("competitions", [{}])[0]
+        competitors = comp.get("competitors", [])
+        if len(competitors) < 2:
+            continue
+        home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+        away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+        home   = home_c.get("team", {}).get("displayName", "TBD")
+        away   = away_c.get("team", {}).get("displayName", "TBD")
+        venue  = comp.get("venue", {}).get("fullName", "")
+        status_name = ev.get("status", {}).get("type", {}).get("name", "")
+        kick_utc    = ev.get("date", "")
+        if kick_utc:
+            kick     = datetime.fromisoformat(kick_utc.replace("Z", "+00:00")).astimezone(tz)
+            time_str = kick.strftime("%-I:%M %p") + f" {tz_label(tz)}"
+        else:
+            time_str = "TBD"
+        if status_name == "STATUS_FULL_TIME":
+            h_score = home_c.get("score", "?")
+            a_score = away_c.get("score", "?")
+            result  = f"🏁 {team_str(home)} *{h_score}–{a_score}* {team_str(away)}"
+        elif status_name in ("STATUS_IN_PROGRESS", "STATUS_HALFTIME",
+                             "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"):
+            h_score = home_c.get("score", "?")
+            a_score = away_c.get("score", "?")
+            clock   = ev.get("status", {}).get("displayClock", "")
+            result  = f"🔴 LIVE {team_str(home)} *{h_score}–{a_score}* {team_str(away)} ({clock})"
+        else:
+            result  = f"⚽ {team_str(home)} vs {team_str(away)}"
+        venue_line = f"\n   📍 {venue}" if venue else ""
+        lines.append(f"{result}\n   🕐 {time_str}{venue_line}\n")
+    reply(chat_id, "\n".join(lines))
 
 
 def cmd_schedule(chat_id: str, query: str):
@@ -1381,45 +1423,76 @@ def cmd_teams(chat_id: str):
         reply(chat_id, f"❌ Error: {e}")
 
 def cmd_bracket(chat_id: str):
-    """Knockout stage bracket."""
+    """Knockout stage bracket using ESPN API."""
     try:
-        stages = ["LAST_16","QUARTER_FINAL","SEMI_FINAL","THIRD_PLACE","FINAL"]
-        stage_names = {
-            "LAST_16":       "🔵 Round of 16",
-            "QUARTER_FINAL": "🟡 Quarter-finals",
-            "SEMI_FINAL":    "🟠 Semi-finals",
-            "THIRD_PLACE":   "🥉 Third Place",
-            "FINAL":         "🏆 Final",
-        }
-        all_matches = []
-        for stage in stages:
-            data = football_api("/competitions/WC/matches", {"stage": stage})
-            all_matches.extend(data.get("matches", []))
+        from datetime import date as _date
+        # Knockout stage date ranges
+        round_dates = [
+            ("🔵 Round of 32",    "2026-06-28", "2026-07-03"),
+            ("🔵 Round of 16",    "2026-07-04", "2026-07-07"),
+            ("🟡 Quarter-finals", "2026-07-09", "2026-07-11"),
+            ("🟠 Semi-finals",    "2026-07-14", "2026-07-15"),
+            ("🥉 Third Place",    "2026-07-18", "2026-07-18"),
+            ("🏆 Final",          "2026-07-19", "2026-07-19"),
+        ]
 
-        if not all_matches:
-            reply(chat_id, t("bracket_wait"))
-            return
+        def date_range(start, end):
+            from datetime import date as d_, timedelta
+            cur = d_.fromisoformat(start)
+            fin = d_.fromisoformat(end)
+            while cur <= fin:
+                yield cur.strftime("%Y%m%d")
+                cur += timedelta(days=1)
+
+        def fetch_espn_day(date_str):
+            r = requests.get(ESPN_URL, params={"dates": date_str}, timeout=15)
+            r.raise_for_status()
+            return r.json().get("events", [])
 
         lines = [t("bracket_hdr") + "\n"]
-        current_stage = None
-        for m in all_matches:
-            stage = m.get("stage", "")
-            if stage != current_stage:
-                current_stage = stage
-                lines.append(f"\n{stage_names.get(stage, stage)}")
-            home   = m["homeTeam"].get("name", "TBD")
-            away   = m["awayTeam"].get("name", "TBD")
-            status = m["status"]
-            if status == "FINISHED":
-                sc = m["score"]["fullTime"]
-                lines.append(f"🏁 {team_str(home)} {sc['home']}–{sc['away']} {team_str(away)}")
-            elif status in ("IN_PLAY","PAUSED"):
-                sc = m["score"].get("fullTime") or m["score"].get("halfTime") or {}
-                lines.append(f"🔴 {team_str(home)} {sc.get('home','?')}–{sc.get('away','?')} {team_str(away)}")
-            else:
-                from datetime import datetime as _dt
-                kick = _dt.fromisoformat(m["utcDate"].replace("Z","+00:00")).astimezone(LOCAL_TZ)
-                lines.append(f"📅 {kick.strftime('%b %-d')} {kick.strftime('%I:%M %p')} PT — {team_str(home)} vs {team_str(away)}")
+        any_match = False
+
+        for round_name, start, end in round_dates:
+            round_lines = []
+            for ds in date_range(start, end):
+                for ev in fetch_espn_day(ds):
+                    comp = ev.get("competitions", [{}])[0]
+                    competitors = comp.get("competitors", [])
+                    if len(competitors) < 2:
+                        continue
+                    # ESPN lists away first
+                    away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[0])
+                    home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[1])
+                    home = home_c.get("team", {}).get("displayName", "TBD")
+                    away = away_c.get("team", {}).get("displayName", "TBD")
+                    status_name = ev.get("status", {}).get("type", {}).get("name", "")
+                    kick_utc = ev.get("date", "")
+                    if kick_utc:
+                        from datetime import datetime as _dt
+                        kick = _dt.fromisoformat(kick_utc.replace("Z", "+00:00")).astimezone(LOCAL_TZ)
+                        date_str2 = kick.strftime("%b %-d %I:%M %p PT")
+                    else:
+                        date_str2 = ""
+                    if status_name == "STATUS_FULL_TIME":
+                        sc = comp.get("competitors", [])
+                        h_score = home_c.get("score", "?")
+                        a_score = away_c.get("score", "?")
+                        round_lines.append(f"🏁 {team_str(home)} {h_score}–{a_score} {team_str(away)}")
+                    elif status_name in ("STATUS_IN_PROGRESS", "STATUS_HALFTIME", "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"):
+                        h_score = home_c.get("score", "?")
+                        a_score = away_c.get("score", "?")
+                        clock = ev.get("status", {}).get("displayClock", "")
+                        round_lines.append(f"🔴 {team_str(home)} {h_score}–{a_score} {team_str(away)} {clock}")
+                    else:
+                        round_lines.append(f"📅 {date_str2} — {team_str(home)} vs {team_str(away)}")
+                    any_match = True
+            if round_lines:
+                lines.append(f"\n{round_name}")
+                lines.extend(round_lines)
+
+        if not any_match:
+            reply(chat_id, t("bracket_wait"))
+            return
         reply(chat_id, "\n".join(lines))
     except Exception as e:
         reply(chat_id, f"❌ Error: {e}")
@@ -1633,6 +1706,7 @@ def polling_loop():
                 params=params, timeout=40
             )
             for upd in r.json().get("result", []):
+                print(f"[poll] update_id={upd['update_id']}", flush=True)
                 offset = upd["update_id"] + 1
                 handle_update(upd)
         except Exception as e:
@@ -1678,7 +1752,7 @@ if __name__ == "__main__":
     set_commands()
 
     # Run immediately on start
-    job_schedule()
+    # job_schedule()  # removed: spams on pod restart
     job_results()
 
     # Schedules
