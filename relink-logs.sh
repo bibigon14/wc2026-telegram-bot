@@ -14,7 +14,7 @@
 
 set -euo pipefail
 
-NAMESPACE="${1:-homelab}"
+NAMESPACE="${1:-apps}"
 PVC_NAME="${2:-wc2026bot-log}"
 LOG_FILE="${3:-access.log}"
 LINK_NAME="${4:-access.log}"
@@ -47,6 +47,9 @@ if [ -L "$LINK_NAME" ]; then
   CURRENT_TARGET=$(readlink "$LINK_NAME")
   if [ "$CURRENT_TARGET" = "$TARGET_PATH" ]; then
     echo "Already correctly linked: $LINK_NAME -> $TARGET_PATH"
+    # Still ensure ACL is set in case it was reset
+    sudo setfacl -R -m u:${USER}:rX "$STORAGE_ROOT"
+    sudo setfacl -d -m u:${USER}:rX "$STORAGE_ROOT"
     exit 0
   fi
   echo "Removing stale symlink (was -> $CURRENT_TARGET)"
@@ -59,8 +62,14 @@ fi
 ln -s "$TARGET_PATH" "$LINK_NAME"
 echo "Linked: $LINK_NAME -> $TARGET_PATH"
 
-# Sanity check: can we actually read it (as root, since PVC dirs are root-owned)?
-if sudo test -r "$TARGET_PATH"; then
+# Grant read access to the storage root via ACL so sudo isn't needed for reads.
+echo "Setting ACL on ${STORAGE_ROOT} for user ${USER}..."
+sudo setfacl -R -m u:${USER}:rX "$STORAGE_ROOT"
+sudo setfacl -d -m u:${USER}:rX "$STORAGE_ROOT"
+echo "ACL set — ${USER} can now read PVC directories without sudo."
+
+# Sanity check
+if test -r "$TARGET_PATH"; then
   echo "Verified: target is readable."
 else
   echo "Warning: symlink created, but target is not readable yet (file may not exist until the pod writes to it)." >&2
