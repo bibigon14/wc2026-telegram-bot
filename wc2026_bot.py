@@ -668,13 +668,39 @@ def build_schedule_message(matches: list, date_str: str, tz=None) -> str:
 
 def job_schedule():
     try:
-        today = now_pt().strftime("%Y-%m-%d")
-        all_m = fetch_openfootball()
-        matches = [m for m in all_m if m["date"] == today]
+        tz_pt   = LOCAL_TZ
+        today   = datetime.now(tz_pt).strftime("%Y%m%d")
+        r       = requests.get(ESPN_URL, params={"dates": today}, timeout=15)
+        r.raise_for_status()
+        events  = r.json().get("events", [])
+        if not events:
+            print(f"[{now_pt().strftime('%I:%M %p PT')}] ℹ️  Schedule: no matches today")
+            return
+        today_label = datetime.now(tz_pt).strftime("%A, %B %-d")
         for _cid in load_subscribers():
             _user_ctx.lang = get_user_lang(_cid)
-            send_md(build_schedule_message(matches, today, get_user_tz(_cid)), _cid, msg_type="schedule")
-        print(f"[{now_pt().strftime('%I:%M %p PT')}] ✅ Schedule sent ({len(matches)} matches)")
+            tz = get_user_tz(_cid)
+            lines = [f"📅 *{today_label}*\n"]
+            for ev in events:
+                comp        = ev.get("competitions", [{}])[0]
+                competitors = comp.get("competitors", [])
+                if len(competitors) < 2:
+                    continue
+                home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+                away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+                home   = home_c.get("team", {}).get("displayName", "TBD")
+                away   = away_c.get("team", {}).get("displayName", "TBD")
+                venue  = comp.get("venue", {}).get("fullName", "")
+                kick_utc = ev.get("date", "")
+                if kick_utc:
+                    kick     = datetime.fromisoformat(kick_utc.replace("Z", "+00:00")).astimezone(tz)
+                    time_str = kick.strftime("%-I:%M %p") + f" {tz_label(tz)}"
+                else:
+                    time_str = "TBD"
+                venue_line = f"\n   📍 {venue}" if venue else ""
+                lines.append(f"⚽ {team_str(home)} vs {team_str(away)}\n   🕐 {time_str}{venue_line}\n")
+            send_md("\n".join(lines), _cid, msg_type="schedule")
+        print(f"[{now_pt().strftime('%I:%M %p PT')}] ✅ Schedule sent ({len(events)} matches)")
     except Exception as e:
         print(f"[{now_pt().strftime('%I:%M %p PT')}] ❌ Schedule: {e}")
 

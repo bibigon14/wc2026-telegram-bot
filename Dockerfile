@@ -1,6 +1,7 @@
 FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
+ENV TZ=America/Los_Angeles
 
 WORKDIR /app
 
