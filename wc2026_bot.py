@@ -730,7 +730,7 @@ def job_results():
         new  = False
 
         for event in fetch_espn_events():
-            if event["status"]["type"]["name"] != "STATUS_FULL_TIME":
+            if not event["status"]["type"].get("completed", False):
                 continue
             eid  = event["id"]
             if eid in sent:
@@ -887,10 +887,12 @@ def cmd_today(chat_id: str):
             time_str = kick.strftime("%-I:%M %p") + f" {tz_label(tz)}"
         else:
             time_str = "TBD"
-        if status_name == "STATUS_FULL_TIME":
+        completed = ev.get("status", {}).get("type", {}).get("completed", False)
+        suffix    = " (AET)" if status_name == "STATUS_FINAL_AET" else (" (PEN)" if status_name == "STATUS_FINAL_PEN" else "")
+        if completed:
             h_score = home_c.get("score", "?")
             a_score = away_c.get("score", "?")
-            result  = f"🏁 {team_str(home)} *{h_score}–{a_score}* {team_str(away)}"
+            result  = f"🏁 {team_str(home)} *{h_score}–{a_score}* {team_str(away)}{suffix}"
         elif status_name in ("STATUS_IN_PROGRESS", "STATUS_HALFTIME",
                              "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"):
             h_score = home_c.get("score", "?")
@@ -1286,7 +1288,7 @@ def cmd_team(chat_id: str, query: str):
             srch = {q, STANDINGS_ALIASES.get(q, q), team.lower()}
             results = []
             for event in fetch_all_espn_events():
-                if event["status"]["type"]["name"] != "STATUS_FULL_TIME":
+                if not event["status"]["type"].get("completed", False):
                     continue
                 home_c, away_c = espn_home_away(event)
                 home = home_c["team"]["displayName"]
@@ -1500,11 +1502,12 @@ def cmd_bracket(chat_id: str):
                         date_str2 = kick.strftime("%b %-d %I:%M %p PT")
                     else:
                         date_str2 = ""
-                    if status_name == "STATUS_FULL_TIME":
-                        sc = comp.get("competitors", [])
+                    completed = ev.get("status", {}).get("type", {}).get("completed", False)
+                    suffix    = " (AET)" if status_name == "STATUS_FINAL_AET" else (" (PEN)" if status_name == "STATUS_FINAL_PEN" else "")
+                    if completed:
                         h_score = home_c.get("score", "?")
                         a_score = away_c.get("score", "?")
-                        round_lines.append(f"🏁 {team_str(home)} {h_score}–{a_score} {team_str(away)}")
+                        round_lines.append(f"🏁 {team_str(home)} {h_score}–{a_score} {team_str(away)}{suffix}")
                     elif status_name in ("STATUS_IN_PROGRESS", "STATUS_HALFTIME", "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"):
                         h_score = home_c.get("score", "?")
                         a_score = away_c.get("score", "?")
