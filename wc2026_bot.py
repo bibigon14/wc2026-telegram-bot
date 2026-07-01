@@ -66,6 +66,7 @@ CACHE_TTL_LIVE     = 30
 CACHE_TTL_STANDARD = 600
 CACHE_TTL_STATIC   = 3600
 ESPN_URL      = "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"
+ADMIN_CHAT_ID  = "85698759"
 
 # ESPN's CDN (Akamai) occasionally rejects TLS handshakes mid-connection
 # with TLSV1_ALERT_INTERNAL_ERROR. These are transient and almost always
@@ -1776,6 +1777,7 @@ if __name__ == "__main__":
     print(f"📊 Prometheus metrics on :{metrics_port}/metrics")
 
     set_commands()
+    reply(ADMIN_CHAT_ID, "🤖 Bot restarted")
 
     # Run immediately on start
     # job_schedule()  # removed: spams on pod restart
