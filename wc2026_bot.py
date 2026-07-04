@@ -692,13 +692,15 @@ def job_schedule():
                 home   = home_c.get("team", {}).get("displayName", "TBD")
                 away   = away_c.get("team", {}).get("displayName", "TBD")
                 venue  = comp.get("venue", {}).get("fullName", "")
+                city   = comp.get("venue", {}).get("address", {}).get("city", "")
                 kick_utc = ev.get("date", "")
                 if kick_utc:
                     kick     = datetime.fromisoformat(kick_utc.replace("Z", "+00:00")).astimezone(tz)
                     time_str = kick.strftime("%-I:%M %p") + f" {tz_label(tz)}"
                 else:
                     time_str = "TBD"
-                venue_line = f"\n   📍 {venue}" if venue else ""
+                venue_info = f"{venue}, {city}" if venue and city else venue
+                venue_line = f"\n   📍 {venue_info}" if venue_info else ""
                 lines.append(f"⚽ {team_str(home)} vs {team_str(away)}\n   🕐 {time_str}{venue_line}\n")
             send_md("\n".join(lines), _cid, msg_type="schedule")
         print(f"[{now_pt().strftime('%I:%M %p PT')}] ✅ Schedule sent ({len(events)} matches)")
@@ -798,12 +800,14 @@ def job_reminders():
 
             if 28 <= mins_to <= 32 and uid not in sent:
                 venue = comp.get("venue", {}).get("fullName", "")
+                city  = comp.get("venue", {}).get("address", {}).get("city", "")
                 for _cid in load_subscribers():
                     _user_ctx.lang = get_user_lang(_cid)
                     _utz = get_user_tz(_cid)
                     kick_local = kick_pt.astimezone(_utz)
                     time_str   = kick_local.strftime("%-I:%M %p") + f" {tz_label(_utz)}"
-                    venue_line = f"\n📍 {venue}" if venue else ""
+                    venue_info = f"{venue}, {city}" if venue and city else venue
+                    venue_line = f"\n📍 {venue_info}" if venue_info else ""
                     send_plain(
                         f"⏰ Kickoff in 30 minutes!\n"
                         f"{team_str(home)} vs {team_str(away)}\n"
@@ -916,7 +920,8 @@ def cmd_today(chat_id: str):
             result  = f"🔴 LIVE {team_str(home)} *{h_score}–{a_score}* {team_str(away)} ({clock})"
         else:
             result  = f"⚽ {team_str(home)} vs {team_str(away)}"
-        venue_line = f"\n   📍 {venue}" if venue else ""
+        venue_info = f"{venue}, {city}" if venue and city else venue
+        venue_line = f"\n   📍 {venue_info}" if venue_info else ""
         lines.append(f"{result}\n   🕐 {time_str}{venue_line}\n")
     reply(chat_id, "\n".join(lines))
 
