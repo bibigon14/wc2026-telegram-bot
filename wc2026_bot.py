@@ -811,6 +811,7 @@ def job_reminders():
 LIVE_STATUSES = {
     "STATUS_IN_PROGRESS", "STATUS_HALFTIME",
     "STATUS_FIRST_HALF", "STATUS_SECOND_HALF",
+    "STATUS_OVERTIME", "STATUS_OVERTIME_HALFTIME",
 }
 
 def job_live():
@@ -893,8 +894,7 @@ def cmd_today(chat_id: str):
             h_score = home_c.get("score", "?")
             a_score = away_c.get("score", "?")
             result  = f"🏁 {team_str(home)} *{h_score}–{a_score}* {team_str(away)}{suffix}"
-        elif status_name in ("STATUS_IN_PROGRESS", "STATUS_HALFTIME",
-                             "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"):
+        elif status_name in LIVE_STATUSES:
             h_score = home_c.get("score", "?")
             a_score = away_c.get("score", "?")
             clock   = ev.get("status", {}).get("displayClock", "")
@@ -1508,7 +1508,7 @@ def cmd_bracket(chat_id: str):
                         h_score = home_c.get("score", "?")
                         a_score = away_c.get("score", "?")
                         round_lines.append(f"🏁 {team_str(home)} {h_score}–{a_score} {team_str(away)}{suffix}")
-                    elif status_name in ("STATUS_IN_PROGRESS", "STATUS_HALFTIME", "STATUS_FIRST_HALF", "STATUS_SECOND_HALF"):
+                    elif status_name in LIVE_STATUSES:
                         h_score = home_c.get("score", "?")
                         a_score = away_c.get("score", "?")
                         clock = ev.get("status", {}).get("displayClock", "")
