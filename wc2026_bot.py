@@ -900,6 +900,7 @@ def cmd_today(chat_id: str):
         home   = home_c.get("team", {}).get("displayName", "TBD")
         away   = away_c.get("team", {}).get("displayName", "TBD")
         venue  = comp.get("venue", {}).get("fullName", "")
+        city   = comp.get("venue", {}).get("address", {}).get("city", "")
         status_name = ev.get("status", {}).get("type", {}).get("name", "")
         kick_utc    = ev.get("date", "")
         if kick_utc:
