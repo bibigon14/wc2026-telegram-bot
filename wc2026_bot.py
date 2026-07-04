@@ -771,34 +771,49 @@ def job_results():
 
 def job_reminders():
     try:
-        sent = set(load_json(SENT_REMINDERS_FILE) or [])
-        all_m = fetch_openfootball()
-        now   = now_pt()
-        new   = False
+        sent     = set(load_json(SENT_REMINDERS_FILE) or [])
+        tz_pt    = LOCAL_TZ
+        today    = datetime.now(tz_pt).strftime("%Y%m%d")
+        r        = requests.get(ESPN_URL, params={"dates": today}, timeout=15)
+        r.raise_for_status()
+        events   = r.json().get("events", [])
+        now      = now_pt()
+        new      = False
 
-        for m in all_m:
-            kick_off = to_local_dt(m["date"], m["time"])
-            mins_to  = (kick_off - now).total_seconds() / 60
-            uid      = f"{m['date']}_{m['team1']}_{m['team2']}"
+        for ev in events:
+            comp        = ev.get("competitions", [{}])[0]
+            competitors = comp.get("competitors", [])
+            if len(competitors) < 2:
+                continue
+            home_c = next((c for c in competitors if c.get("homeAway") == "home"), competitors[0])
+            away_c = next((c for c in competitors if c.get("homeAway") == "away"), competitors[1])
+            home   = home_c.get("team", {}).get("displayName", "TBD")
+            away   = away_c.get("team", {}).get("displayName", "TBD")
+            kick_utc = ev.get("date", "")
+            if not kick_utc:
+                continue
+            kick_pt  = datetime.fromisoformat(kick_utc.replace("Z", "+00:00")).astimezone(tz_pt)
+            mins_to  = (kick_pt - now).total_seconds() / 60
+            uid      = ev.get("id", f"{kick_utc}_{home}_{away}")
 
             if 28 <= mins_to <= 32 and uid not in sent:
-                stage = m.get("group") or m.get("round", "")
-                city  = m.get("ground", "")
-                pt    = to_local(m["date"], m["time"], LOCAL_TZ)
+                venue = comp.get("venue", {}).get("fullName", "")
                 for _cid in load_subscribers():
                     _user_ctx.lang = get_user_lang(_cid)
                     _utz = get_user_tz(_cid)
-                    pt = to_local(m["date"], m["time"], _utz)
+                    kick_local = kick_pt.astimezone(_utz)
+                    time_str   = kick_local.strftime("%-I:%M %p") + f" {tz_label(_utz)}"
+                    venue_line = f"\n📍 {venue}" if venue else ""
                     send_plain(
-                        f"{t('kickoff_30', stage=stage)}\n"
-                        f"{team_str(m['team1'])} vs {team_str(m['team2'])}\n" +
-                        t("kickoff_time", time=pt, city=city, tz=tz_label(_utz)),
+                        f"⏰ Kickoff in 30 minutes!\n"
+                        f"{team_str(home)} vs {team_str(away)}\n"
+                        f"🕐 {time_str}{venue_line}",
                         _cid,
                         msg_type="reminder",
                     )
                 sent.add(uid)
                 new = True
-                print(f"[{now_pt().strftime('%I:%M %p PT')}] ⏰ Reminder: {m['team1']} vs {m['team2']}")
+                print(f"[{now_pt().strftime('%I:%M %p PT')}] ⏰ Reminder: {home} vs {away}")
 
         if new:
             save_json(SENT_REMINDERS_FILE, list(sent))
