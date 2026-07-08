@@ -1528,6 +1528,9 @@ def cmd_bracket(chat_id: str):
                     if completed:
                         h_score = home_c.get("score", "?")
                         a_score = away_c.get("score", "?")
+                        if status_name == "STATUS_FINAL_PEN":
+                            winner = home if home_c.get("winner") else away
+                            suffix = f" (PEN: {team_str(winner)} advances)"
                         round_lines.append(f"🏁 {team_str(home)} {h_score}–{a_score} {team_str(away)}{suffix}")
                     elif status_name in LIVE_STATUSES:
                         h_score = home_c.get("score", "?")
