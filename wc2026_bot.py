@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Telegram bot — FIFA World Cup 2026
+Telegram bot - FIFA World Cup 2026
 
 Auto features:
   📅 Daily schedule every morning at SEND_TIME
@@ -9,11 +9,11 @@ Auto features:
   📊 Live score update when a goal is scored
 
 Commands:
-  /today          — today's matches
-  /schedule <team>— group stage schedule for a team
-  /next <team>    — next match + countdown
-  /standings <team> — group table
-  /live           — live scores right now
+  /today          - today's matches
+  /schedule <team>- group stage schedule for a team
+  /next <team>    - next match + countdown
+  /standings <team> - group table
+  /live           - live scores right now
 
 Setup:
   pip3 install requests schedule --break-system-packages
@@ -153,7 +153,7 @@ def _classify_api(url: str) -> str:
 def _instrument_response(response, *args, **kwargs):
     """
     Response hook attached to the module-level session. Runs once per
-    completed request — after all urllib3 retries finish. Records
+    completed request - after all urllib3 retries finish. Records
     request count, status outcome, and total wall-clock duration.
     The retry counter is derived from urllib3's connection-pool history
     attached to the response.
@@ -311,7 +311,7 @@ FLAG = {
 
 T = {
     "en": {
-        "schedule_header": "⚽ *World Cup 2026 — {date}*",
+        "schedule_header": "⚽ *World Cup 2026 - {date}*",
         "no_matches":      "⚽ *World Cup 2026 | {date}*\n\nNo matches today 🏖",
         "enjoy":           "_Enjoy the games!_ 🏆",
         "full_time":       "🏁 Full time",
@@ -333,49 +333,49 @@ T = {
         "in":              "In",
         "standings_na":    "❌ Team not found or standings not available yet for *{query}*.",
         "standings_na2":   "Standings not available yet.",
-        "standings_hdr":   "📊 *Standings — {group}*",
-        "scorers_hdr":     "⚽ *Top Scorers — World Cup 2026*",
+        "standings_hdr":   "📊 *Standings - {group}*",
+        "scorers_hdr":     "⚽ *Top Scorers - World Cup 2026*",
         "no_scorers":      "No goals scored yet.",
         "no_finished":     "No finished matches yet.",
-        "groups_hdr":      "🏆 *World Cup 2026 — Standings*",
-        "goals_hdr":       "⚽ *Goals Today — World Cup 2026*",
+        "groups_hdr":      "🏆 *World Cup 2026 - Standings*",
+        "goals_hdr":       "⚽ *Goals Today - World Cup 2026*",
         "no_goals":        "No goals scored today yet.",
-        "red_hdr":         "🟥 *Red Cards — World Cup 2026*",
+        "red_hdr":         "🟥 *Red Cards - World Cup 2026*",
         "no_red":          "🟥 No red cards in the tournament yet.",
-        "yellow_hdr":      "🟨 *Yellow Cards — Top Teams*",
+        "yellow_hdr":      "🟨 *Yellow Cards - Top Teams*",
         "no_yellow":       "🟨 No yellow cards yet.",
         "recent":          "📋 *Recent results:*",
         "yellow_n":        "🟨 *Yellow cards ({n}):*",
         "next_vs":         "⏭ *Next:* vs {opp}",
-        "bracket_hdr":     "🏆 *World Cup 2026 — Knockout Stage*",
+        "bracket_hdr":     "🏆 *World Cup 2026 - Knockout Stage*",
         "bracket_wait":    "⏳ Knockout stage hasn\'t started yet.\nGroup stage runs until June 27.",
         "d": "d", "h": "h", "m": "m",
         "cmd_today":     "Today\'s matches",
-        "cmd_schedule":  "Team group schedule — /schedule Germany",
-        "cmd_next":      "Next match for a team — /next Brazil",
-        "cmd_standings": "Group table — /standings Spain",
+        "cmd_schedule":  "Team group schedule - /schedule Germany",
+        "cmd_next":      "Next match for a team - /next Brazil",
+        "cmd_standings": "Group table - /standings Spain",
         "cmd_live":      "Live scores right now",
         "cmd_scorers":   "Top scorers of the tournament",
         "cmd_groups":    "All group standings",
         "cmd_goals":     "Goals scored today",
         "cmd_red":       "Red cards in the tournament",
         "cmd_yellow":    "Yellow cards in the tournament",
-        "cmd_team":      "Team overview — /team USA",
+        "cmd_team":      "Team overview - /team USA",
         "cmd_bracket":   "Knockout stage bracket",
         "cmd_teams":     "All team names for bot commands",
         "cmd_subscribe":  "Subscribe to auto-notifications",
-        "cmd_timezone":   "Set your timezone — /timezone moscow",
-        "cmd_localization": "Switch language — /localization ru",
+        "cmd_timezone":   "Set your timezone - /timezone moscow",
+        "cmd_localization": "Switch language - /localization ru",
         "cmd_unsubscribe": "Unsubscribe from notifications",
         "subscribed":     "Subscribed! You will receive auto-notifications.",
         "already_sub":    "You are already subscribed.",
         "unsubscribed":   "Unsubscribed.",
         "not_sub":        "You are not subscribed.",
-        "teams_hdr":     "📋 *WC 2026 — All Teams*",
+        "teams_hdr":     "📋 *WC 2026 - All Teams*",
         "teams_hint":    "Use these names with /schedule /next /standings /team",
     },
     "ru": {
-        "schedule_header": "⚽ *ЧМ 2026 — {date}*",
+        "schedule_header": "⚽ *ЧМ 2026 - {date}*",
         "no_matches":      "⚽ *ЧМ 2026 | {date}*\n\nСегодня матчей нет 🏖",
         "enjoy":           "_Приятного просмотра!_ 🏆",
         "full_time":       "🏁 Финальный свисток",
@@ -397,45 +397,45 @@ T = {
         "in":              "Через",
         "standings_na":    "❌ Команда не найдена или таблица недоступна для *{query}*.",
         "standings_na2":   "Таблица ещё недоступна.",
-        "standings_hdr":   "📊 *Таблица — {group}*",
-        "scorers_hdr":     "⚽ *Бомбардиры — ЧМ 2026*",
+        "standings_hdr":   "📊 *Таблица - {group}*",
+        "scorers_hdr":     "⚽ *Бомбардиры - ЧМ 2026*",
         "no_scorers":      "Голов пока не забито.",
         "no_finished":     "Завершённых матчей пока нет.",
-        "groups_hdr":      "🏆 *ЧМ 2026 — Таблицы групп*",
-        "goals_hdr":       "⚽ *Голы сегодня — ЧМ 2026*",
+        "groups_hdr":      "🏆 *ЧМ 2026 - Таблицы групп*",
+        "goals_hdr":       "⚽ *Голы сегодня - ЧМ 2026*",
         "no_goals":        "Сегодня голов пока нет.",
-        "red_hdr":         "🟥 *Красные карточки — ЧМ 2026*",
+        "red_hdr":         "🟥 *Красные карточки - ЧМ 2026*",
         "no_red":          "🟥 Красных карточек пока нет.",
-        "yellow_hdr":      "🟨 *Жёлтые карточки — Топ команд*",
+        "yellow_hdr":      "🟨 *Жёлтые карточки - Топ команд*",
         "no_yellow":       "🟨 Жёлтых карточек пока нет.",
         "recent":          "📋 *Последние результаты:*",
         "yellow_n":        "🟨 *Жёлтые карточки ({n}):*",
         "next_vs":         "⏭ *Следующий:* vs {opp}",
-        "bracket_hdr":     "🏆 *ЧМ 2026 — Плей-офф*",
+        "bracket_hdr":     "🏆 *ЧМ 2026 - Плей-офф*",
         "bracket_wait":    "⏳ Плей-офф ещё не начался.\nГрупповой этап идёт до 27 июня.",
         "d": "д", "h": "ч", "m": "м",
         "cmd_today":     "Матчи сегодня",
-        "cmd_schedule":  "Расписание команды — /schedule Germany",
-        "cmd_next":      "Следующий матч — /next Brazil",
-        "cmd_standings": "Таблица группы — /standings Spain",
+        "cmd_schedule":  "Расписание команды - /schedule Germany",
+        "cmd_next":      "Следующий матч - /next Brazil",
+        "cmd_standings": "Таблица группы - /standings Spain",
         "cmd_live":      "Прямой эфир",
         "cmd_scorers":   "Бомбардиры турнира",
         "cmd_groups":    "Все групповые таблицы",
         "cmd_goals":     "Голы сегодня",
         "cmd_red":       "Красные карточки",
         "cmd_yellow":    "Жёлтые карточки",
-        "cmd_team":      "Обзор команды — /team USA",
+        "cmd_team":      "Обзор команды - /team USA",
         "cmd_bracket":   "Сетка плей-офф",
         "cmd_teams":     "Все команды для команд бота",
         "cmd_subscribe":  "Подписаться на авто-уведомления",
-        "cmd_timezone":   "Установить часовой пояс — /timezone moscow",
-        "cmd_localization": "Язык бота — /localization en",
+        "cmd_timezone":   "Установить часовой пояс - /timezone moscow",
+        "cmd_localization": "Язык бота - /localization en",
         "cmd_unsubscribe": "Отписаться от уведомлений",
         "subscribed":     "Подписан! Будешь получать авто-уведомления.",
         "already_sub":    "Ты уже подписан.",
         "unsubscribed":   "Отписан.",
         "not_sub":        "Ты не подписан.",
-        "teams_hdr":     "📋 *ЧМ 2026 — Все команды*",
+        "teams_hdr":     "📋 *ЧМ 2026 - Все команды*",
         "teams_hint":    "Используй с /schedule /next /standings /team",
     }
 }
@@ -662,7 +662,7 @@ def build_schedule_message(matches: list, date_str: str, tz=None) -> str:
         pt    = to_local(m["date"], m["time"], tz)
         stage = m.get("group") or m.get("round", "")
         city  = m.get("ground", "")
-        lines.append(f"🕐 *{pt} {tlabel}* — {team_str(m['team1'])} vs {team_str(m['team2'])}")
+        lines.append(f"🕐 *{pt} {tlabel}* - {team_str(m['team1'])} vs {team_str(m['team2'])}")
         lines.append(f"   📍 {city}  |  {stage}\n")
     lines.append(t("enjoy"))
     return "\n".join(lines)
@@ -757,10 +757,10 @@ def job_results():
             group = event.get("season", {}).get("slug", "").replace("-", " ").title()
             for _cid in load_subscribers():
                 _user_ctx.lang = get_user_lang(_cid)
-                send_plain(f"{t('full_time')}\n{team_str(home)} {h}–{a} {team_str(away)}{extra}", _cid, msg_type="result")
+                send_plain(f"{t('full_time')}\n{team_str(home)} {h}-{a} {team_str(away)}{extra}", _cid, msg_type="result")
             sent.add(eid)
             new = True
-            print(f"[{now_pt().strftime('%I:%M %p PT')}] 🏁 Result: {home} {h}–{a} {away}")
+            print(f"[{now_pt().strftime('%I:%M %p PT')}] 🏁 Result: {home} {h}-{a} {away}")
             time.sleep(1)
 
         if new:
@@ -856,8 +856,8 @@ def job_live():
             if eid in prev and prev[eid] != key:
                 for _cid in load_subscribers():
                     _user_ctx.lang = get_user_lang(_cid)
-                    send_plain(f"{t('goal', minute=minute)}\n{team_str(home)} {h}–{a} {team_str(away)}", _cid, msg_type="live")
-                print(f"[{now_pt().strftime('%I:%M %p PT')}] ⚽ Goal: {home} {h}–{a} {away} ({minute}')")
+                    send_plain(f"{t('goal', minute=minute)}\n{team_str(home)} {h}-{a} {team_str(away)}", _cid, msg_type="live")
+                print(f"[{now_pt().strftime('%I:%M %p PT')}] ⚽ Goal: {home} {h}-{a} {away} ({minute}')")
 
             updated[eid] = key
 
@@ -913,12 +913,12 @@ def cmd_today(chat_id: str):
         if completed:
             h_score = home_c.get("score", "?")
             a_score = away_c.get("score", "?")
-            result  = f"🏁 {team_str(home)} *{h_score}–{a_score}* {team_str(away)}{suffix}"
+            result  = f"🏁 {team_str(home)} *{h_score}-{a_score}* {team_str(away)}{suffix}"
         elif status_name in LIVE_STATUSES:
             h_score = home_c.get("score", "?")
             a_score = away_c.get("score", "?")
             clock   = ev.get("status", {}).get("displayClock", "")
-            result  = f"🔴 LIVE {team_str(home)} *{h_score}–{a_score}* {team_str(away)} ({clock})"
+            result  = f"🔴 LIVE {team_str(home)} *{h_score}-{a_score}* {team_str(away)} ({clock})"
         else:
             result  = f"⚽ {team_str(home)} vs {team_str(away)}"
         venue_info = f"{venue}, {city}" if venue and city else venue
@@ -941,7 +941,7 @@ def cmd_schedule(chat_id: str, query: str):
         reply(chat_id, t("no_group", team=team))
         return
     group = group_m[0].get("group", "")
-    lines = [f"⚽ *{team_str(team)}* — {group}\n"]
+    lines = [f"⚽ *{team_str(team)}* - {group}\n"]
     for m in sorted(group_m, key=lambda m: to_local_dt(m["date"], m["time"])):
         opp      = m["team2"] if m["team1"] == team else m["team1"]
         tz       = get_user_tz(chat_id)
@@ -1108,7 +1108,7 @@ def cmd_scorers(chat_id: str):
         for rank, player, team, g, a in ranked:
             if rank > cutoff_rank:
                 break
-            lines.append(f"{rank}. *{player}* {flag(team)} — ⚽ {g}  🎯 {a}")
+            lines.append(f"{rank}. *{player}* {flag(team)} - ⚽ {g}  🎯 {a}")
         reply(chat_id, "\n".join(lines))
     except Exception as e:
         reply(chat_id, f"❌ Error fetching scorers: {e}")
@@ -1139,7 +1139,7 @@ def cmd_groups(chat_id: str):
                 gd   = row["goalDifference"]
                 gd_s = f"+{gd}" if gd > 0 else str(gd)
                 icon = pos_icons.get(pos, f"{pos}.")
-                lines.append(f"{icon} {f_} {name} — {pts} pts ({w}W {d}D {l}L {gd_s})")
+                lines.append(f"{icon} {f_} {name} - {pts} pts ({w}W {d}D {l}L {gd_s})")
             groups.append("\n".join(lines))
 
         mid  = len(groups) // 2
@@ -1200,7 +1200,7 @@ def cmd_goals(chat_id: str):
             if match_goals:
                 h = int(home_c.get("score") or 0)
                 a = int(away_c.get("score") or 0)
-                lines.append(f"{team_str(home)} {h}–{a} {team_str(away)}")
+                lines.append(f"{team_str(home)} {h}-{a} {team_str(away)}")
                 lines.extend(match_goals)
                 lines.append("")
                 found = True
@@ -1280,7 +1280,7 @@ def cmd_team(chat_id: str, query: str):
                         gd   = row["goalDifference"]
                         gd_s = f"+{gd}" if gd > 0 else str(gd)
                         icons = {1:"🥇",2:"🥈",3:"🥉",4:"4️⃣"}
-                        lines.append(f"📊 *{group_name}* — {icons.get(pos,str(pos)+'.')} place | {pts} pts | {w}W {d}D {l}L | GD {gd_s}")
+                        lines.append(f"📊 *{group_name}* - {icons.get(pos,str(pos)+'.')} place | {pts} pts | {w}W {d}D {l}L | GD {gd_s}")
                         break
         except Exception:
             pass
@@ -1323,7 +1323,7 @@ def cmd_team(chat_id: str, query: str):
                 opp_name = away if is_home else home
                 res = "W" if my_g > op_g else ("D" if my_g == op_g else "L")
                 emoji = {"W":"✅","D":"🟡","L":"❌"}[res]
-                results.append(f"  {emoji} {res} {my_g}–{op_g} vs {team_str(opp_name)}")
+                results.append(f"  {emoji} {res} {my_g}-{op_g} vs {team_str(opp_name)}")
             if results:
                 lines.append(f"\n{t('recent')}")
                 lines.extend(results[-5:])
@@ -1382,7 +1382,7 @@ def set_commands_for_chat(chat_id: str, lang: str):
 def cmd_localization(chat_id: str, arg: str):
     cur = get_user_lang(chat_id)
     if not arg:
-        reply(chat_id, f"Current language: *{'English' if cur == 'en' else 'Русский'}*\n\n/localization en — English\n/localization ru — Русский")
+        reply(chat_id, f"Current language: *{'English' if cur == 'en' else 'Русский'}*\n\n/localization en - English\n/localization ru - Русский")
         return
     lang = arg.lower().strip()
     if lang not in ("en", "ru"):
@@ -1400,22 +1400,22 @@ def cmd_timezone(chat_id: str, arg: str):
     if not arg:
         tz = get_user_tz(chat_id)
         popular = [
-            "PT (UTC-7) — /timezone pt",
-            "MT (UTC-6) — /timezone mt",
-            "CT (UTC-5) — /timezone ct",
-            "ET (UTC-4) — /timezone et",
-            "Sao Paulo (UTC-3) — /timezone brazil",
-            "Buenos Aires (UTC-3) — /timezone argentina",
-            "GMT (UTC+0) — /timezone gmt",
-            "London (UTC+1) — /timezone london",
-            "Paris (UTC+2) — /timezone paris",
-            "Berlin (UTC+2) — /timezone berlin",
-            "Moscow (UTC+3) — /timezone moscow",
-            "Minsk (UTC+3) — /timezone minsk",
-            "Kyiv (UTC+2/3) — /timezone kyiv",
-            "Dubai (UTC+4) — /timezone dubai",
-            "Tokyo (UTC+9) — /timezone tokyo",
-            "Seoul (UTC+9) — /timezone korea",
+            "PT (UTC-7) - /timezone pt",
+            "MT (UTC-6) - /timezone mt",
+            "CT (UTC-5) - /timezone ct",
+            "ET (UTC-4) - /timezone et",
+            "Sao Paulo (UTC-3) - /timezone brazil",
+            "Buenos Aires (UTC-3) - /timezone argentina",
+            "GMT (UTC+0) - /timezone gmt",
+            "London (UTC+1) - /timezone london",
+            "Paris (UTC+2) - /timezone paris",
+            "Berlin (UTC+2) - /timezone berlin",
+            "Moscow (UTC+3) - /timezone moscow",
+            "Minsk (UTC+3) - /timezone minsk",
+            "Kyiv (UTC+2/3) - /timezone kyiv",
+            "Dubai (UTC+4) - /timezone dubai",
+            "Tokyo (UTC+9) - /timezone tokyo",
+            "Seoul (UTC+9) - /timezone korea",
         ]
         reply(chat_id, f"*Current timezone:* {tz_label(tz)}\n\nSet with: /timezone moscow\n\n" + "\n".join(popular))
         return
@@ -1531,14 +1531,14 @@ def cmd_bracket(chat_id: str):
                         if status_name == "STATUS_FINAL_PEN":
                             winner = home if home_c.get("winner") else away
                             suffix = f" (PEN: {team_str(winner)} advances)"
-                        round_lines.append(f"🏁 {team_str(home)} {h_score}–{a_score} {team_str(away)}{suffix}")
+                        round_lines.append(f"🏁 {team_str(home)} {h_score}-{a_score} {team_str(away)}{suffix}")
                     elif status_name in LIVE_STATUSES:
                         h_score = home_c.get("score", "?")
                         a_score = away_c.get("score", "?")
                         clock = ev.get("status", {}).get("displayClock", "")
-                        round_lines.append(f"🔴 {team_str(home)} {h_score}–{a_score} {team_str(away)} {clock}")
+                        round_lines.append(f"🔴 {team_str(home)} {h_score}-{a_score} {team_str(away)} {clock}")
                     else:
-                        round_lines.append(f"📅 {date_str2} — {team_str(home)} vs {team_str(away)}")
+                        round_lines.append(f"📅 {date_str2} - {team_str(home)} vs {team_str(away)}")
                     any_match = True
             if round_lines:
                 lines.append(f"\n{round_name}")
@@ -1596,7 +1596,7 @@ def cmd_yellow(chat_id: str):
             if n != prev:
                 display_rank += 1
                 prev = n
-            lines.append(f"{display_rank}. {flag(team_name)} *{team_name}* — {n} 🟨")
+            lines.append(f"{display_rank}. {flag(team_name)} *{team_name}* - {n} 🟨")
         reply(chat_id, "\n".join(lines))
     except Exception as e:
         reply(chat_id, f"❌ Error: {e}")
@@ -1615,7 +1615,7 @@ def cmd_live(chat_id: str):
         h      = int(home_c.get("score") or 0)
         a      = int(away_c.get("score") or 0)
         minute = event["status"].get("displayClock", "?")
-        live.append(f"{team_str(home)} *{h}–{a}* {team_str(away)}  _{minute}'_")
+        live.append(f"{team_str(home)} *{h}-{a}* {team_str(away)}  _{minute}'_")
 
     if not live:
         reply(chat_id, t("no_live"))
@@ -1693,7 +1693,7 @@ def handle_update(update: dict):
     if not text.startswith("/"):
         return
     if not check_rate_limit(chat_id):
-        send_plain("⏳ Too many requests — please wait a minute." if get_user_lang(chat_id) != "ru" else "⏳ Слишком много запросов — подожди минутку.", chat_id)
+        send_plain("⏳ Too many requests - please wait a minute." if get_user_lang(chat_id) != "ru" else "⏳ Слишком много запросов - подожди минутку.", chat_id)
         return
     # Access log
     frm      = msg.get("from", {})

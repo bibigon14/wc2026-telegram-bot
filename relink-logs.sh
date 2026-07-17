@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# relink-logs.sh — find the current local-path PVC directory for
+# relink-logs.sh - find the current local-path PVC directory for
 # wc2026bot-log and repoint ./access.log at it.
 #
 # Why this exists: k3s's local-path-provisioner names each PVC's backing
 # directory after the PV's UID (pvc-<uid>_<namespace>_<pvc-name>). If the
 # PVC is ever recreated (helm uninstall/install, PV reclaim, etc.) the UID
-# changes and any existing symlink silently breaks — `ls` shows it, but
+# changes and any existing symlink silently breaks - `ls` shows it, but
 # reads fail with a confusing "Permission denied" (broken target) instead
 # of a clear "no such PVC" error.
 #
@@ -38,7 +38,7 @@ TARGET_PATH="${TARGET_DIR}/${LOG_FILE}"
 if ! sudo test -d "$TARGET_DIR"; then
   echo "Error: expected directory not found: $TARGET_DIR" >&2
   echo "Listing what's actually under ${STORAGE_ROOT}/ matching '${PVC_NAME}':" >&2
-  sudo ls -la "$STORAGE_ROOT" 2>/dev/null | grep "$PVC_NAME" >&2 || echo "  (nothing matched — PVC dir may not exist yet)" >&2
+  sudo ls -la "$STORAGE_ROOT" 2>/dev/null | grep "$PVC_NAME" >&2 || echo "  (nothing matched - PVC dir may not exist yet)" >&2
   exit 1
 fi
 
@@ -55,7 +55,7 @@ if [ -L "$LINK_NAME" ]; then
   echo "Removing stale symlink (was -> $CURRENT_TARGET)"
   rm "$LINK_NAME"
 elif [ -e "$LINK_NAME" ]; then
-  echo "Error: $LINK_NAME exists and is not a symlink — refusing to overwrite." >&2
+  echo "Error: $LINK_NAME exists and is not a symlink - refusing to overwrite." >&2
   exit 1
 fi
 
@@ -66,7 +66,7 @@ echo "Linked: $LINK_NAME -> $TARGET_PATH"
 echo "Setting ACL on ${STORAGE_ROOT} for user ${USER}..."
 sudo setfacl -R -m u:${USER}:rX "$STORAGE_ROOT"
 sudo setfacl -d -m u:${USER}:rX "$STORAGE_ROOT"
-echo "ACL set — ${USER} can now read PVC directories without sudo."
+echo "ACL set - ${USER} can now read PVC directories without sudo."
 
 # Sanity check
 if test -r "$TARGET_PATH"; then
