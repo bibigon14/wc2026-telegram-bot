@@ -595,6 +595,75 @@ def football_api(endpoint: str, params: dict = None, ttl: int = CACHE_TTL_STANDA
 
     return data
 
+def espn_scoreboard(date_str: str, ttl: int = CACHE_TTL_LIVE):
+    """
+    Cached wrapper around ESPN's scoreboard endpoint for a single YYYYMMDD date.
+    Falls back to a live request transparently if Redis is unavailable
+    or the entry isn't cached yet.
+    """
+    cache_key = f"wc2026:espn:scoreboard:{date_str}"
+
+    if _redis:
+        try:
+            cached = _redis.get(cache_key)
+        except Exception as e:
+            M_CACHE_OPERATIONS.labels(op="get", outcome="error").inc()
+            print(f"[redis] get failed: {e}")
+            cached = None
+        if cached is not None:
+            M_CACHE_OPERATIONS.labels(op="get", outcome="hit").inc()
+            return json.loads(cached)
+        M_CACHE_OPERATIONS.labels(op="get", outcome="miss").inc()
+
+    r = requests.get(ESPN_URL, params={"dates": date_str}, timeout=15)
+    r.raise_for_status()
+    data = r.json()
+
+    if _redis:
+        try:
+            _redis.setex(cache_key, ttl, json.dumps(data))
+            M_CACHE_OPERATIONS.labels(op="set", outcome="hit").inc()
+        except Exception as e:
+            M_CACHE_OPERATIONS.labels(op="set", outcome="error").inc()
+            print(f"[redis] setex failed: {e}")
+
+    return data
+
+
+def espn_summary(event_id: str, ttl: int = CACHE_TTL_LIVE):
+    """Cached wrapper around ESPN's per-event summary endpoint (keyEvents etc.)."""
+    cache_key = f"wc2026:espn:summary:{event_id}"
+
+    if _redis:
+        try:
+            cached = _redis.get(cache_key)
+        except Exception as e:
+            M_CACHE_OPERATIONS.labels(op="get", outcome="error").inc()
+            print(f"[redis] get failed: {e}")
+            cached = None
+        if cached is not None:
+            M_CACHE_OPERATIONS.labels(op="get", outcome="hit").inc()
+            return json.loads(cached)
+        M_CACHE_OPERATIONS.labels(op="get", outcome="miss").inc()
+
+    r = requests.get(
+        "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary",
+        params={"event": event_id}, timeout=15
+    )
+    r.raise_for_status()
+    data = r.json()
+
+    if _redis:
+        try:
+            _redis.setex(cache_key, ttl, json.dumps(data))
+            M_CACHE_OPERATIONS.labels(op="set", outcome="hit").inc()
+        except Exception as e:
+            M_CACHE_OPERATIONS.labels(op="set", outcome="error").inc()
+            print(f"[redis] setex failed: {e}")
+
+    return data
+
+
 def find_team(query: str, matches: list) -> str | None:
     query = query.strip().lower()
     teams = set()
@@ -671,9 +740,7 @@ def job_schedule():
     try:
         tz_pt   = LOCAL_TZ
         today   = datetime.now(tz_pt).strftime("%Y%m%d")
-        r       = requests.get(ESPN_URL, params={"dates": today}, timeout=15)
-        r.raise_for_status()
-        events  = r.json().get("events", [])
+        events  = espn_scoreboard(today).get("events", [])
         if not events:
             print(f"[{now_pt().strftime('%I:%M %p PT')}] ℹ️  Schedule: no matches today")
             return
@@ -717,9 +784,7 @@ def fetch_espn_events():
     utc_now = datetime.now(timezone.utc)
     for delta in (-1, 0, 1):
         date_str = (utc_now + timedelta(days=delta)).strftime("%Y%m%d")
-        r = requests.get(ESPN_URL, params={"dates": date_str}, timeout=15)
-        r.raise_for_status()
-        for e in r.json().get("events", []):
+        for e in espn_scoreboard(date_str).get("events", []):
             if e["id"] not in seen:
                 seen.add(e["id"])
                 events.append(e)
@@ -776,9 +841,7 @@ def job_reminders():
         sent     = set(load_json(SENT_REMINDERS_FILE) or [])
         tz_pt    = LOCAL_TZ
         today    = datetime.now(tz_pt).strftime("%Y%m%d")
-        r        = requests.get(ESPN_URL, params={"dates": today}, timeout=15)
-        r.raise_for_status()
-        events   = r.json().get("events", [])
+        events   = espn_scoreboard(today).get("events", [])
         now      = now_pt()
         new      = False
 
@@ -878,9 +941,7 @@ def cmd_today(chat_id: str):
     tz    = get_user_tz(chat_id)
     today = datetime.now(tz).strftime("%Y%m%d")
     try:
-        r = requests.get(ESPN_URL, params={"dates": today}, timeout=15)
-        r.raise_for_status()
-        events = r.json().get("events", [])
+        events = espn_scoreboard(today).get("events", [])
         print(f"[cmd_today] date={today} events={len(events)}", flush=True)
     except Exception as e:
         reply(chat_id, f"❌ Error fetching schedule: {e}")
@@ -1067,9 +1128,7 @@ def fetch_all_espn_events():
     end    = (datetime.now(timezone.utc) + timedelta(days=1)).date()
     d = start
     while d <= end:
-        r = requests.get(ESPN_URL, params={"dates": d.strftime("%Y%m%d")}, timeout=15)
-        r.raise_for_status()
-        for e in r.json().get("events", []):
+        for e in espn_scoreboard(d.strftime("%Y%m%d")).get("events", []):
             if e["id"] not in seen:
                 seen.add(e["id"])
                 events.append(e)
@@ -1155,12 +1214,7 @@ def cmd_groups(chat_id: str):
 
 def fetch_match_events(event_id: str) -> list:
     """Fetch keyEvents for a single ESPN event."""
-    r = requests.get(
-        "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/summary",
-        params={"event": event_id}, timeout=15
-    )
-    r.raise_for_status()
-    return r.json().get("keyEvents", [])
+    return espn_summary(event_id).get("keyEvents", [])
 
 
 def espn_home_away(event: dict):
