@@ -1858,7 +1858,10 @@ if __name__ == "__main__":
     print(f"📊 Prometheus metrics on :{metrics_port}/metrics")
 
     set_commands()
-    reply(ADMIN_CHAT_ID, "🤖 Bot restarted")
+    # Startup Telegram ping removed - pod restarts (image bumps, OOM, node
+    # drain) fire this bot's main chat too often and the admin PM becomes
+    # noise. Startup is still visible in stdout above and in the Prometheus
+    # process_start_time_seconds series on :9120.
 
     # Run immediately on start
     # job_schedule()  # removed: spams on pod restart
