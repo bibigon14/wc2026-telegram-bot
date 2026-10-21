@@ -587,11 +587,11 @@ def football_api(endpoint: str, params: dict = None, ttl: int = CACHE_TTL_STANDA
 
     if _redis:
         try:
-            _redis.setex(cache_key, ttl, json.dumps(data))
+            _redis.set(cache_key, json.dumps(data), ex=ttl)
             M_CACHE_OPERATIONS.labels(op="set", outcome="hit").inc()
         except Exception as e:
             M_CACHE_OPERATIONS.labels(op="set", outcome="error").inc()
-            print(f"[redis] setex failed: {e}")
+            print(f"[redis] set failed: {e}")
 
     return data
 
@@ -621,11 +621,11 @@ def espn_scoreboard(date_str: str, ttl: int = CACHE_TTL_LIVE):
 
     if _redis:
         try:
-            _redis.setex(cache_key, ttl, json.dumps(data))
+            _redis.set(cache_key, json.dumps(data), ex=ttl)
             M_CACHE_OPERATIONS.labels(op="set", outcome="hit").inc()
         except Exception as e:
             M_CACHE_OPERATIONS.labels(op="set", outcome="error").inc()
-            print(f"[redis] setex failed: {e}")
+            print(f"[redis] set failed: {e}")
 
     return data
 
@@ -655,11 +655,11 @@ def espn_summary(event_id: str, ttl: int = CACHE_TTL_LIVE):
 
     if _redis:
         try:
-            _redis.setex(cache_key, ttl, json.dumps(data))
+            _redis.set(cache_key, json.dumps(data), ex=ttl)
             M_CACHE_OPERATIONS.labels(op="set", outcome="hit").inc()
         except Exception as e:
             M_CACHE_OPERATIONS.labels(op="set", outcome="error").inc()
-            print(f"[redis] setex failed: {e}")
+            print(f"[redis] set failed: {e}")
 
     return data
 
